@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>EEM Fingerprint · 水质三维荧光指纹平台</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js" charset="utf-8"></script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ Top Bar ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo"></span>
+      EEM·FINGERPRINT
+      <small>v1.0 · 水质三维荧光光谱指纹分析平台</small>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-page="process">[ 01 ] 数据加载与预处理</button>
+      <button class="tab" data-page="library">[ 02 ] 指纹库</button>
+      <button class="tab" data-page="search">[ 03 ] 检索</button>
+      <button class="tab" data-page="compare">[ 04 ] 比对</button>
+    </nav>
+  </header>
+
+  <!-- ============ Main ============ -->
+  <main>
+
+    <!-- ====== Page 1: Process ====== -->
+    <section class="page page-process active" id="page-process">
+      <aside class="sidebar">
+        <!-- 上传区 -->
+        <div class="panel">
+          <h3>EEM 数据加载</h3>
+          <div class="upload blank-zone" id="up-blank">
+            <span class="label">＋ 加载空白 (纯水) EEM</span>
+            <span class="filename" id="fn-blank">未选择</span>
+            <input type="file" id="file-blank" accept=".csv">
+          </div>
+          <div class="upload sample-zone" id="up-sample">
+            <span class="label">＋ 加载样本 EEM</span>
+            <span class="filename" id="fn-sample">未选择</span>
+            <input type="file" id="file-sample" accept=".csv">
+          </div>
+        </div>
+
+        <!-- 参数 -->
+        <div class="panel">
+          <h3>预处理参数</h3>
+          <div class="row"><label>通道聚合</label>
+            <select id="p-agg">
+              <option value="median">median</option>
+              <option value="hampel">hampel</option>
+              <option value="tmean">tmean</option>
+              <option value="mean">mean</option>
+            </select>
+          </div>
+          <div class="row"><label>Em 最小 (nm)</label>
+            <input type="number" id="p-em-min" value="200"></div>
+          <div class="row"><label>Em 最大 (nm)</label>
+            <input type="number" id="p-em-max" value="600"></div>
+          <div class="row"><label>Ex 上限 (nm)</label>
+            <input type="number" id="p-ex-keep" value="600"></div>
+          <div class="row"><label>瑞利屏蔽 (nm)</label>
+            <input type="number" id="p-ray" value="15" step="0.5"></div>
+          <div class="row"><label>拉曼屏蔽 (nm)</label>
+            <input type="number" id="p-raman" value="15" step="0.5"></div>
+          <div class="row"><label>SG 窗口</label>
+            <input type="number" id="p-sgw" value="11" step="2"></div>
+          <div class="row"><label>SG 多项式阶</label>
+            <input type="number" id="p-sgp" value="3"></div>
+        </div>
+
+        <!-- 操作 -->
+        <button class="btn primary" id="btn-run">▶ 运行预处理 + 特征提取</button>
+        <button class="btn pink" id="btn-add" disabled style="margin-top:10px; width:100%;">+ 入库当前样本</button>
+      </aside>
+
+      <div class="viewer">
+        <div style="display:flex;flex-direction:column;height:100%;">
+          <div class="view-tabs">
+            <button class="view-tab active" data-view="contour">▣ 等高线 (corrected)</button>
+            <button class="view-tab" data-view="pcolor">▦ 伪彩图 (corrected)</button>
+            <button class="view-tab" data-view="raw">▤ 原始 (raw)</button>
+            <button class="view-tab" data-view="fri">▌ FRI 占比</button>
+          </div>
+          <div class="view-host">
+            <div id="plot" class="plot"></div>
+            <div class="fill-toggle" id="fill-ctrl" style="display:none;">
+              着色:
+              <select id="sel-fill">
+                <option value="fill">填充</option>
+                <option value="lines">仅等值线</option>
+              </select>
+            </div>
+            <div class="loader-overlay" id="loader">
+              <div class="loader-text">▶ PROCESSING EEM...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tables">
+          <div class="table-box">
+            <h4>FRI 五区域</h4>
+            <table id="tbl-fri"><tbody><tr><td colspan="3" class="empty">— 待运行 —</td></tr></tbody></table>
+          </div>
+          <div class="table-box">
+            <h4>主荧光峰</h4>
+            <table id="tbl-peaks"><tbody><tr><td colspan="4" class="empty">— 待运行 —</td></tr></tbody></table>
+          </div>
+          <div class="table-box">
+            <h4>统计描述子</h4>
+            <table id="tbl-stats"><tbody><tr><td colspan="2" class="empty">— 待运行 —</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== Page 2: Library ====== -->
+    <section class="page page-library" id="page-library">
+      <!-- 指纹列表 (放在按钮之上, 占据页面顶部位置) -->
+      <div class="lib-table-wrap">
+        <table class="lib-table" id="lib-table">
+          <thead><tr>
+            <th>ID</th><th>名称</th><th>类别</th><th>原始文件</th>
+            <th>空白</th><th>时间</th><th>备注</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="lib-tools" style="margin-top:12px;">
+        <button class="btn" id="btn-lib-refresh">🗘 刷新</button>
+        <button class="btn danger" id="btn-lib-delete">− 删除选中</button>
+        <span style="color:var(--text-mute);font-family:var(--mono);font-size:11px;" id="lib-stat">·</span>
+      </div>
+    </section>
+
+    <!-- ====== Page 3: Search ====== -->
+    <section class="page page-search" id="page-search">
+      <!-- 检索控件 -->
+      <div class="lib-tools">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">Top-K</span>
+        <input type="number" id="s-topk" value="10" style="width:60px;background:rgba(6,11,24,0.8);border:1px solid var(--line);color:var(--text);font-family:var(--mono);padding:5px 8px;border-radius:3px;">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">余弦权重</span>
+        <input type="number" id="s-wcos" value="0.6" step="0.05" style="width:60px;background:rgba(6,11,24,0.8);border:1px solid var(--line);color:var(--text);font-family:var(--mono);padding:5px 8px;border-radius:3px;">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">欧式权重</span>
+        <input type="number" id="s-weu" value="0.4" step="0.05" style="width:60px;background:rgba(6,11,24,0.8);border:1px solid var(--line);color:var(--text);font-family:var(--mono);padding:5px 8px;border-radius:3px;">
+        <button class="btn" id="btn-search">🔍 用当前样本检索</button>
+        <span style="color:var(--text-mute);font-family:var(--mono);font-size:11px;" id="search-stat">需先在 [01] 运行一次预处理</span>
+      </div>
+
+      <!-- TOP-N 检索结果列表 (在指纹图对比之上) -->
+      <div class="search-section">
+        <div class="section-header">
+          <span class="section-bar"></span>
+          <span class="section-title">TOP-N 检索结果</span>
+          <span class="section-hint">点击列表中的某一行,下方将展示该指纹与查询样本的并排对比</span>
+        </div>
+        <div class="lib-table-wrap" style="max-height:300px;">
+          <table class="lib-table" id="search-table">
+            <thead><tr>
+              <th style="width:50px;">排名</th>
+              <th style="width:50px;">ID</th>
+              <th>名称</th>
+              <th>类别</th>
+              <th>余弦相似度</th>
+              <th>欧式距离</th>
+              <th>综合评分</th>
+            </tr></thead>
+            <tbody>
+              <tr><td colspan="7" class="empty">— 等待检索 —</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 指纹图对比 -->
+      <div class="search-section" style="margin-top:14px;">
+        <div class="section-header">
+          <span class="section-bar"></span>
+          <span class="section-title">指纹对比 · QUERY vs CANDIDATE</span>
+        </div>
+        <div class="search-grid">
+          <div id="plot-q" class="plot"></div>
+          <div id="plot-c" class="plot"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== Page 4: Compare ====== -->
+    <section class="page page-compare" id="page-compare">
+      <div class="compare-grid">
+        <div class="panel">
+          <h3>Sample A</h3>
+          <div class="upload blank-zone" id="up-a-blank">
+            <span class="label">＋ 空白 EEM (A)</span>
+            <span class="filename" id="fn-a-blank">未选择</span>
+            <input type="file" id="file-a-blank" accept=".csv">
+          </div>
+          <div class="upload sample-zone" id="up-a-sample">
+            <span class="label">＋ 样本 EEM (A)</span>
+            <span class="filename" id="fn-a-sample">未选择</span>
+            <input type="file" id="file-a-sample" accept=".csv">
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Sample B</h3>
+          <div class="upload blank-zone" id="up-b-blank">
+            <span class="label">＋ 空白 EEM (B)</span>
+            <span class="filename" id="fn-b-blank">未选择</span>
+            <input type="file" id="file-b-blank" accept=".csv">
+          </div>
+          <div class="upload sample-zone" id="up-b-sample">
+            <span class="label">＋ 样本 EEM (B)</span>
+            <span class="filename" id="fn-b-sample">未选择</span>
+            <input type="file" id="file-b-sample" accept=".csv">
+          </div>
+        </div>
+      </div>
+      <button class="btn primary" id="btn-compare" style="margin-top:14px;">▶ 计算两样本相似度</button>
+      <div class="compare-result" id="compare-result" style="display:none;">
+        <div style="text-align:center;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:var(--text-dim);">// SIMILARITY SCORE</div>
+          <div class="score-big" id="cmp-score">·</div>
+        </div>
+        <div class="metric"><span>余弦相似度 cosine</span><span class="v" id="cmp-cos">·</span></div>
+        <div class="metric"><span>归一化欧式距离 euclidean</span><span class="v" id="cmp-eu">·</span></div>
+      </div>
+      <div class="search-grid" style="margin-top:14px;">
+        <div id="plot-cmp-a" class="plot"></div>
+        <div id="plot-cmp-b" class="plot"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ Status Bar ============ -->
+  <footer class="statusbar">
+    <span class="dot"></span>
+    <span id="bar-status">SYSTEM READY</span>
+    <span style="margin-left:auto;" id="bar-session">SESSION: --</span>
+  </footer>
+</div>
+
+<div id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
